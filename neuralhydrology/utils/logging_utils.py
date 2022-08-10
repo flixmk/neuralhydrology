@@ -17,9 +17,7 @@ def setup_logging(log_file: str):
     """
     file_handler = logging.FileHandler(filename=log_file)
     stdout_handler = logging.StreamHandler(sys.stdout)
-
     logging.basicConfig(handlers=[file_handler, stdout_handler], level=logging.INFO, format="%(asctime)s: %(message)s")
-
     # Make sure we log uncaught exceptions
     def exception_logging(type, value, tb):
         LOGGER.exception(f"Uncaught exception", exc_info=(type, value, tb))

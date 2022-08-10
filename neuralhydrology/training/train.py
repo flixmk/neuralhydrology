@@ -20,4 +20,18 @@ def start_training(cfg: Config):
     else:
         raise ValueError(f"Unknown head {cfg.head}.")
     trainer.initialize_training()
-    trainer.train_and_validate()
+    val_loss = trainer.train_and_validate()
+
+
+
+def start_tuning(cfg: Config):
+    if cfg.head.lower() in ['regression', 'gmm', 'cmal', '']:
+        trainer = BaseTrainer(cfg=cfg, logging_flag=False)
+    elif cfg.head.lower() == 'umal':
+        trainer = UMALTrainer(cfg=cfg)
+    else:
+        raise ValueError(f"Unknown head {cfg.head}.")
+    trainer.initialize_training()
+    val_loss = trainer.train_and_validate()
+
+    return val_loss

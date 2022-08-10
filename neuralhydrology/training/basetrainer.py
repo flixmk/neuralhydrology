@@ -36,9 +36,11 @@ class BaseTrainer(object):
         The run configuration.
     """
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, logging_flag=True):
         super(BaseTrainer, self).__init__()
         self.cfg = cfg
+        # TODO: Either completely suppress Loggings or dont. Where are the other ones coming from?
+        self.logging = logging_flag
         self.model = None
         self.optimizer = None
         self.loss_obj = None
@@ -60,17 +62,20 @@ class BaseTrainer(object):
 
         self._create_folder_structure()
         setup_logging(str(self.cfg.run_dir / "output.log"))
-        LOGGER.info(f"### Folder structure created at {self.cfg.run_dir}")
+
+
+        LOGGER.info(f"### Folder structure created at {self.cfg.run_dir}") if self.logging else None
 
         if self.cfg.is_continue_training:
-            LOGGER.info(f"### Continue training of run stored in {self.cfg.base_run_dir}")
+            LOGGER.info(f"### Continue training of run stored in {self.cfg.base_run_dir}") if self.logging else None
 
         if self.cfg.is_finetuning:
-            LOGGER.info(f"### Start finetuning with pretrained model stored in {self.cfg.base_run_dir}")
+            LOGGER.info(f"### Start finetuning with pretrained model stored in {self.cfg.base_run_dir}") if self.logging else None
 
-        LOGGER.info(f"### Run configurations for {self.cfg.experiment_name}")
-        for key, val in self.cfg.as_dict().items():
-            LOGGER.info(f"{key}: {val}")
+        LOGGER.info(f"### Run configurations for {self.cfg.experiment_name}") if self.logging else None
+        if self.logging:
+            for key, val in self.cfg.as_dict().items():
+                LOGGER.info(f"{key}: {val}")
 
         self._set_random_seeds()
         self._set_device()
@@ -125,7 +130,7 @@ class BaseTrainer(object):
                 else:
                     unresolved_modules.append(module_group)
         if unresolved_modules:
-            LOGGER.warning(f"Could not resolve the following module parts for finetuning: {unresolved_modules}")
+            LOGGER.warning(f"Could not resolve the following module parts for finetuning: {unresolved_modules}") if self.logging else None
 
     def initialize_training(self):
         """Initialize the training class.
@@ -136,12 +141,12 @@ class BaseTrainer(object):
         """
         self.model = self._get_model().to(self.device)
         if self.cfg.checkpoint_path is not None:
-            LOGGER.info(f"Starting training from Checkpoint {self.cfg.checkpoint_path}")
+            LOGGER.info(f"Starting training from Checkpoint {self.cfg.checkpoint_path}") if self.logging else None
             self.model.load_state_dict(torch.load(str(self.cfg.checkpoint_path), map_location=self.device))
         elif self.cfg.checkpoint_path is None and self.cfg.is_finetuning:
             # the default for finetuning is the last model state
             checkpoint_path = [x for x in sorted(list(self.cfg.base_run_dir.glob('model_epoch*.pt')))][-1]
-            LOGGER.info(f"Starting training from checkpoint {checkpoint_path}")
+            LOGGER.info(f"Starting training from checkpoint {checkpoint_path}") if LOGGER is not None else None
             self.model.load_state_dict(torch.load(str(checkpoint_path), map_location=self.device))
 
         # freeze model parts and load scaler from pre-trained model
@@ -198,7 +203,7 @@ class BaseTrainer(object):
         """
         for epoch in range(self._epoch + 1, self._epoch + self.cfg.epochs + 1):
             if epoch in self.cfg.learning_rate.keys():
-                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}")
+                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
                 for param_group in self.optimizer.param_groups:
                     param_group["lr"] = self.cfg.learning_rate[epoch]
 
@@ -226,6 +231,9 @@ class BaseTrainer(object):
         # make sure to close tensorboard to avoid losing the last epoch
         if self.cfg.log_tensorboard:
             self.experiment_logger.stop_tb()
+
+        # felix_krause: temporary change to forward an evaluation metric
+        return valid_metrics['avg_loss']
 
     def _get_start_epoch_number(self):
         if self.cfg.is_continue_training:
@@ -335,7 +343,7 @@ class BaseTrainer(object):
                 self.device = torch.device("cpu")
         else:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        LOGGER.info(f"### Device {self.device} will be used for training")
+        LOGGER.info(f"### Device {self.device} will be used for training") if self.logging else None
 
     def _create_folder_structure(self):
         # create as subdirectory within run directory of base run

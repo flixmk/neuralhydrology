@@ -6,7 +6,7 @@ from pathlib import Path
 # make sure code directory is in path, even if the package is not installed using the setup.py
 sys.path.append(str(Path(__file__).parent.parent))
 from neuralhydrology.evaluation.evaluate import start_evaluation
-from neuralhydrology.training.train import start_training
+from neuralhydrology.training.train import start_training, start_tuning
 from neuralhydrology.utils.config import Config
 from neuralhydrology.utils.logging_utils import setup_logging
 
@@ -74,6 +74,19 @@ def start_run(config_file: Path, gpu: int = None):
         config.device = "cpu"
 
     start_training(config)
+
+
+def start_hptuning(config_file: Path, gpu: int = None):
+    config = Config(config_file)
+
+    # check if a GPU has been specified as command line argument. If yes, overwrite config
+    if gpu is not None and gpu >= 0:
+        config.device = f"cuda:{gpu}"
+    if gpu is not None and gpu < 0:
+        config.device = "cpu"
+
+    val_loss = start_tuning(config)
+    return val_loss
 
 
 def continue_run(run_dir: Path, config_file: Path = None, gpu: int = None):
