@@ -20,7 +20,7 @@ def start_training(cfg: Config):
     else:
         raise ValueError(f"Unknown head {cfg.head}.")
     trainer.initialize_training()
-    val_loss = trainer.train_and_validate()
+    trainer.train_and_validate()
 
 
 
@@ -32,6 +32,6 @@ def start_tuning(cfg: Config):
     else:
         raise ValueError(f"Unknown head {cfg.head}.")
     trainer.initialize_training()
-    val_loss = trainer.train_and_validate()
+    metrics = trainer.train_and_validate()
 
-    return val_loss
+    return metrics

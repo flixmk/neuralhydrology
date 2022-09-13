@@ -85,8 +85,8 @@ def start_hptuning(config_file: Path, gpu: int = None):
     if gpu is not None and gpu < 0:
         config.device = "cpu"
 
-    val_loss = start_tuning(config)
-    return val_loss
+    metrics = start_tuning(config)
+    return metrics
 
 
 def continue_run(run_dir: Path, config_file: Path = None, gpu: int = None):

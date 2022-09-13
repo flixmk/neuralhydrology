@@ -39,7 +39,6 @@ class BaseTrainer(object):
     def __init__(self, cfg: Config, logging_flag=True):
         super(BaseTrainer, self).__init__()
         self.cfg = cfg
-        # TODO: Either completely suppress Loggings or dont. Where are the other ones coming from?
         self.logging = logging_flag
         self.model = None
         self.optimizer = None
@@ -201,6 +200,7 @@ class BaseTrainer(object):
         Train the model for the number of epochs specified in the run configuration, and perform validation after every
         ``validate_every`` epochs. Model and optimizer state are saved after every ``save_weights_every`` epochs.
         """
+        metrics_across_epochs = list()
         for epoch in range(self._epoch + 1, self._epoch + self.cfg.epochs + 1):
             if epoch in self.cfg.learning_rate.keys():
                 LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
@@ -222,6 +222,7 @@ class BaseTrainer(object):
                                         experiment_logger=self.experiment_logger.valid())
 
                 valid_metrics = self.experiment_logger.summarise()
+                metrics_across_epochs.append(valid_metrics)
                 print_msg = f"Epoch {epoch} average validation loss: {valid_metrics['avg_loss']:.5f}"
                 if self.cfg.metrics:
                     print_msg += f" -- Median validation metrics: "
@@ -233,7 +234,7 @@ class BaseTrainer(object):
             self.experiment_logger.stop_tb()
 
         # felix_krause: temporary change to forward an evaluation metric
-        return valid_metrics['avg_loss']
+        return metrics_across_epochs
 
     def _get_start_epoch_number(self):
         if self.cfg.is_continue_training:
