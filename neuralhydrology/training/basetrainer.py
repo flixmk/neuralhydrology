@@ -62,7 +62,6 @@ class BaseTrainer(object):
         self._create_folder_structure()
         setup_logging(str(self.cfg.run_dir / "output.log"))
 
-
         LOGGER.info(f"### Folder structure created at {self.cfg.run_dir}") if self.logging else None
 
         if self.cfg.is_continue_training:
@@ -75,7 +74,7 @@ class BaseTrainer(object):
         if self.logging:
             for key, val in self.cfg.as_dict().items():
                 LOGGER.info(f"{key}: {val}")
-
+                
         self._set_random_seeds()
         self._set_device()
 
@@ -87,7 +86,18 @@ class BaseTrainer(object):
 
     def _get_optimizer(self) -> torch.optim.Optimizer:
         return get_optimizer(model=self.model, cfg=self.cfg)
-
+    
+    def _get_lr_scheduler(self) -> torch.optim.lr_scheduler:
+        if self.cfg.lr_scheduler == "plateau" or self.cfg.lr_scheduler == None:
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+        elif self.cfg.lr_scheduler == 'linear':
+            return torch.optim.lr_scheduler.LinearLR(self.optimizer)
+        elif self.cfg.lr_scheduler == "exponential":
+            return torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=2)
+        else:
+            LOGGER.warning(f"{self.cfg.lr_scheduler} is not a valid / supported scheduler. The default scheduler is chosen (ReduceLROnPlateau).")
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+        
     def _get_loss_obj(self) -> loss.BaseLoss:
         return get_loss_obj(cfg=self.cfg)
 
@@ -154,6 +164,7 @@ class BaseTrainer(object):
             self._scaler = load_scaler(self.cfg.base_run_dir)
 
         self.optimizer = self._get_optimizer()
+        self.lr_scheduler = self._get_lr_scheduler()
         self.loss_obj = self._get_loss_obj().to(self.device)
 
         # Add possible regularization terms to the loss function.
@@ -202,10 +213,10 @@ class BaseTrainer(object):
         """
         metrics_across_epochs = list()
         for epoch in range(self._epoch + 1, self._epoch + self.cfg.epochs + 1):
-            if epoch in self.cfg.learning_rate.keys():
-                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
-                for param_group in self.optimizer.param_groups:
-                    param_group["lr"] = self.cfg.learning_rate[epoch]
+#            if epoch in self.cfg.learning_rate.keys():
+#                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
+#                for param_group in self.optimizer.param_groups:
+#                    param_group["lr"] = self.cfg.learning_rate[epoch]
 
             self._train_epoch(epoch=epoch)
             avg_loss = self.experiment_logger.summarise()
@@ -223,6 +234,12 @@ class BaseTrainer(object):
 
                 valid_metrics = self.experiment_logger.summarise()
                 metrics_across_epochs.append(valid_metrics)
+                if type(self.lr_scheduler) == torch.optim.lr_scheduler.ReduceLROnPlateau:
+                    self.lr_scheduler.step(valid_metrics['avg_loss'])
+                    LOGGER.info("Plateau")
+                else:
+                    self.lr_scheduler.step()
+                    LOGGER.info("Other scheduler.")
                 print_msg = f"Epoch {epoch} average validation loss: {valid_metrics['avg_loss']:.5f}"
                 if self.cfg.metrics:
                     print_msg += f" -- Median validation metrics: "

@@ -235,6 +235,9 @@ class OptunaTuner(Tuner):
         LOGGER.info(f"Running {n_trials} experiments")
         self.config_file = config_file
         self.config = Config(config_file)
+        
+        config_dict = self.config.as_dict()
+        print(config_dict)
 
         self.study = self.create_study()
         

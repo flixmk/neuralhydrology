@@ -415,6 +415,13 @@ class Config(object):
                 raise ValueError("Unsupported data type for learning rate. Use either dict (epoch to float) or float.")
         else:
             raise ValueError("No learning rate specified in the config (.yml).")
+        
+    @property
+    def lr_scheduler(self) -> str:
+        if (self._cfg.get("lr_scheduler", None) is None) or (self._cfg["lr_scheduler"] == "plateau"):
+            return None
+        else:
+            return self._cfg["lr_scheduler"]
 
     @property
     def log_interval(self) -> int:

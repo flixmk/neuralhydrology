@@ -13,7 +13,7 @@ from neuralhydrology.utils.logging_utils import setup_logging
 
 def _get_args() -> dict:
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=["train", "continue_training", "finetune", "evaluate"])
+    parser.add_argument('mode', choices=["train", "continue_training", "finetune", "evaluate", "hp_tuning"])
     parser.add_argument('--config-file', type=str)
     parser.add_argument('--run-dir', type=str)
     parser.add_argument('--epoch', type=int, help="Epoch, of which the model should be evaluated")
@@ -41,6 +41,8 @@ def _main():
 
     if args["mode"] == "train":
         start_run(config_file=Path(args["config_file"]), gpu=args["gpu"])
+    elif args["mode"] == "hp_tuning":
+        start_hptuning(config_file=Path(args["config_file"]), gpu=args["gpu"])
     elif args["mode"] == "continue_training":
         continue_run(run_dir=Path(args["run_dir"]),
                      config_file=Path(args["config_file"]) if args["config_file"] is not None else None,
