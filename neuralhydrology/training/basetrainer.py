@@ -88,14 +88,14 @@ class BaseTrainer(object):
         return get_optimizer(model=self.model, cfg=self.cfg)
     
     def _get_lr_scheduler(self) -> torch.optim.lr_scheduler:
-        if self.cfg.lr_scheduler == "plateau" or self.cfg.lr_scheduler == None:
+        if self.cfg.learning_rate["scheduler"] == "plateau" or self.cfg.learning_rate["scheduler"] == "default":
             return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
-        elif self.cfg.lr_scheduler == 'linear':
+        elif self.cfg.learning_rate["scheduler"] == 'linear':
             return torch.optim.lr_scheduler.LinearLR(self.optimizer)
-        elif self.cfg.lr_scheduler == "exponential":
-            return torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=2)
+        elif self.cfg.learning_rate["scheduler"] == "exponential":
+            return torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.5)
         else:
-            LOGGER.warning(f"{self.cfg.lr_scheduler} is not a valid / supported scheduler. The default scheduler is chosen (ReduceLROnPlateau).")
+            LOGGER.warning(f"Selected scheduler is not a valid / supported scheduler. The default scheduler is chosen (ReduceLROnPlateau).")
             return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
         
     def _get_loss_obj(self) -> loss.BaseLoss:
@@ -165,6 +165,7 @@ class BaseTrainer(object):
 
         self.optimizer = self._get_optimizer()
         self.lr_scheduler = self._get_lr_scheduler()
+        LOGGER.info(f"Used lr-scheduler: {type(self.lr_scheduler)}")
         self.loss_obj = self._get_loss_obj().to(self.device)
 
         # Add possible regularization terms to the loss function.
@@ -213,6 +214,7 @@ class BaseTrainer(object):
         """
         metrics_across_epochs = list()
         for epoch in range(self._epoch + 1, self._epoch + self.cfg.epochs + 1):
+            # this is the manual lr-rate code. Replaced with a lr-scheduler.
 #            if epoch in self.cfg.learning_rate.keys():
 #                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
 #                for param_group in self.optimizer.param_groups:
@@ -236,10 +238,10 @@ class BaseTrainer(object):
                 metrics_across_epochs.append(valid_metrics)
                 if type(self.lr_scheduler) == torch.optim.lr_scheduler.ReduceLROnPlateau:
                     self.lr_scheduler.step(valid_metrics['avg_loss'])
-                    LOGGER.info("Plateau")
                 else:
                     self.lr_scheduler.step()
-                    LOGGER.info("Other scheduler.")
+                # LOGGER.info(f"Current LR: {self.optimizer.param_groups[0]['lr']}")
+                    
                 print_msg = f"Epoch {epoch} average validation loss: {valid_metrics['avg_loss']:.5f}"
                 if self.cfg.metrics:
                     print_msg += f" -- Median validation metrics: "

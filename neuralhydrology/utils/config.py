@@ -403,18 +403,6 @@ class Config(object):
     @property
     def lagged_features(self) -> dict:
         return self._as_default_dict(self._cfg.get("lagged_features", {}))
-
-    @property
-    def learning_rate(self) -> Dict[int, float]:
-        if ("learning_rate" in self._cfg.keys()) and (self._cfg["learning_rate"] is not None):
-            if isinstance(self._cfg["learning_rate"], float):
-                return {0: self._cfg["learning_rate"]}
-            elif isinstance(self._cfg["learning_rate"], dict):
-                return self._cfg["learning_rate"]
-            else:
-                raise ValueError("Unsupported data type for learning rate. Use either dict (epoch to float) or float.")
-        else:
-            raise ValueError("No learning rate specified in the config (.yml).")
         
     @property
     def lr_scheduler(self) -> str:
@@ -422,6 +410,24 @@ class Config(object):
             return None
         else:
             return self._cfg["lr_scheduler"]
+        
+    @property
+    def learning_rate(self) -> dict:
+        """Short summary because it replaces the old learning_rate property
+
+        Returns:
+            dict: Containns start_value and scheduler. If no scheduler is selected ReduceLROnPlateau is used.
+            Can be extended to also use the additional parameters of the schedulers.
+        """
+        if (self._cfg.get("learning_rate", None) is None):
+            raise ValueError("No learning rate specified in the config (.yml).")
+        else:
+            if isinstance(self._cfg["learning_rate"], float):
+                return {"start_value": self._cfg["learning_rate"], "scheduler": "plateau"}
+            elif isinstance(self._cfg["learning_rate"], dict):
+                return self._cfg["learning_rate"]
+            else:
+                raise ValueError("Unsupported data type for learning rate. Use either dict (\"start_value\" and \"scheduler\") or float.")
 
     @property
     def log_interval(self) -> int:
