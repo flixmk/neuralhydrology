@@ -166,6 +166,7 @@ class BaseTrainer(object):
         self.optimizer = self._get_optimizer()
         self.lr_scheduler = self._get_lr_scheduler()
         LOGGER.info(f"Used lr-scheduler: {type(self.lr_scheduler)}")
+        
         self.loss_obj = self._get_loss_obj().to(self.device)
 
         # Add possible regularization terms to the loss function.

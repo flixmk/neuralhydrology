@@ -12,6 +12,16 @@ from neuralhydrology.utils.logging_utils import setup_logging
 
 from neuralhydrology.nh_run import start_hptuning
 
+
+
+
+import ray
+from ray import tune
+from ray.air import session
+from ray.tune.search import ConcurrencyLimiter
+from ray.tune.search.optuna import OptunaSearch
+
+
 LOGGER = logging.getLogger(__name__)
 
 # TODO: Make hparams optimize a custom goal
@@ -33,7 +43,7 @@ class HpTuner():
         # TODO: Maybe other baysian methods aswell? TPE seems to be the most prominent one there.
         if method is None or method == 'tpe':
             self.method = 0
-            return OptunaTuner(sampler_id=self.method)
+            return RayTuner()
         elif method == 'cma-es':
             self.method = 1
             return OptunaTuner(sampler_id=self.method)
@@ -246,6 +256,139 @@ class OptunaTuner(Tuner):
         
         fig = optuna.visualization.plot_optimization_history(self.study)
         fig.show()
+
+    def get_best_params(self):
+        trial = self.study.best_trial
+        for key, value in trial.params.items():
+            LOGGER.info("{}: {}".format(key, value))
+
+    def save_best_params(self):
+        trial = self.study.best_trial
+        config_dict = self.config.as_dict()
+
+        for key, value in trial.params.items():
+            config_dict[key] = value
+        print('Saved best config')
+        self.config._cfg = config_dict
+
+        if os.path.exists("./best_config.yml"):
+            os.remove("./best_config.yml")
+
+        self.config.dump_config(Path("./"), filename="best_config.yml")
+
+    def create_study(self):
+        if self.sampler_id == None or 0:
+            return optuna.create_study(sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner(), direction="minimize")
+        elif self.sampler_id == 1:
+            return optuna.create_study(sampler=optuna.samplers.CmaEsSampler(), pruner=optuna.pruners.MedianPruner(), direction="minimize")
+        else:
+            return optuna.create_study(sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner(), direction="minimize")
+        
+        
+class RayTuner(Tuner):
+    """_summary_
+
+    Args:
+        Tuner (_type_): _description_
+    """
+
+    def __init__(self):
+        super(RayTuner, self).__init__()
+        self.config = None
+        self.study = None
+        self.param_names_range = None
+        self.params = None
+        self.predefined_ranges, self.param_info = self.get_possible_hparams()
+        
+        self.search_space = {
+            "steps": 100,
+            "hidden_size": tune.uniform(32, 256),
+            "output_dropout": tune.uniform(0.0, 0.9),
+            "model": tune.choice(['cudalstm', 'ealstm', 'mtslstm'])
+        }
+        pass
+
+    def set_params(self, params=None, model=None):
+        if params == None:
+            self.param_names_range = self.predefined_ranges
+        else:
+            self.param_names_range = params
+            
+        if model == None:
+            self.model_info = self.get_model_info()
+        else:
+            self.model_info = model
+
+    def define_hparams(self, config):
+        config_dict = self.config.as_dict()
+        
+        ## setting the hyperparameters
+        LOGGER.info("The following parameters get used this run:")
+        for key, value in self.search_space.items():
+            if key != "steps":
+                config_dict[key] = config[key]
+            LOGGER.info(f"{key}, {config_dict[key]}")
+            
+
+        self.config._cfg = config_dict
+
+        if os.path.exists("./hp.yml"):
+            os.remove("./hp.yml")
+
+        self.config.dump_config(Path("./"), filename="hp.yml")
+
+    def objective(self, config):
+        for step in range(config["steps"]):
+            self.define_hparams(config)
+            if torch.cuda.is_available():
+                metrics = start_hptuning(config_file=self.config_file)
+
+            # fall back to CPU-only mode
+            else:
+                metrics = start_hptuning(config_file=self.config_file, gpu=-1)
+
+            eval_metric = self.get_metrics(metrics, 'avg_loss',3)
+            session.report({"iterations": step, "mean_loss": eval_metric})
+
+    def get_metrics(self, metrics, used_metric,epoch_lookback):
+        # epoch_lookback: average the last x epochs for a metric to not just use a lucky drop in loss.
+        sorted_metrics = dict()
+        for key in metrics[0].keys():
+            sorted_metrics[key] = list()
+        for metrics_epoch in metrics:
+            for key in metrics_epoch.keys():
+                sorted_metrics[key].append(metrics_epoch[key])
+        eval_metric = sorted_metrics[used_metric][-epoch_lookback:]
+        eval_metric = np.mean(np.array(eval_metric))
+
+        LOGGER.info(f"Using {used_metric} as metric.")
+        LOGGER.info(f"Averaging the last {epoch_lookback} epochs.")
+
+        return eval_metric
+
+    def run(self, config_file: Path, n_trials):
+        LOGGER.info(f"Running {n_trials} experiments")
+        self.config_file = config_file
+        self.config = Config(config_file)
+        
+        config_dict = self.config.as_dict()
+        print(config_dict)
+        algo = OptunaSearch()
+        algo = ConcurrencyLimiter(algo, max_concurrent=2)
+        num_samples = 1000
+        tuner = tune.Tuner(
+            self.objective,
+            tune_config=tune.TuneConfig(
+                metric="mean_loss",
+                mode="min",
+                search_alg=algo,
+                num_samples=num_samples,
+            ),
+            param_space=self.search_space,
+        )
+        results = tuner.fit()
+        
+        LOGGER.info(f"Best hyperparameters found were: {results.get_best_result().config}")
 
     def get_best_params(self):
         trial = self.study.best_trial
