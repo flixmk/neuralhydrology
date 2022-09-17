@@ -430,6 +430,17 @@ class Config(object):
                 raise ValueError("Unsupported data type for learning rate. Use either dict (\"start_value\" and \"scheduler\") or float.")
 
     @property
+    def hptuning(self) -> dict:
+        if (self._cfg.get("hptuning", None) is not None):
+            if isinstance(self._cfg["hptuning"], dict):
+                return self._cfg["hptuning"]
+            else:
+                raise ValueError("Unsupported data type for learning rate. Use either dict (\"start_value\" and \"scheduler\") or float.")
+        else:
+            pass
+
+
+    @property
     def log_interval(self) -> int:
         return self._cfg.get("log_interval", 10)
 
