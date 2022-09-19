@@ -9,11 +9,12 @@ from neuralhydrology.evaluation.evaluate import start_evaluation
 from neuralhydrology.training.train import start_training, start_tuning
 from neuralhydrology.utils.config import Config
 from neuralhydrology.utils.logging_utils import setup_logging
+from neuralhydrology.tuning.tune import HpTuner
 
 
 def _get_args() -> dict:
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=["train", "continue_training", "finetune", "evaluate", "hp_tuning"])
+    parser.add_argument('mode', choices=["train", "continue_training", "finetune", "evaluate", "hptuning"])
     parser.add_argument('--config-file', type=str)
     parser.add_argument('--run-dir', type=str)
     parser.add_argument('--epoch', type=int, help="Epoch, of which the model should be evaluated")
@@ -41,7 +42,7 @@ def _main():
 
     if args["mode"] == "train":
         start_run(config_file=Path(args["config_file"]), gpu=args["gpu"])
-    elif args["mode"] == "hp_tuning":
+    elif args["mode"] == "hptuning":
         start_hptuning(config_file=Path(args["config_file"]), gpu=args["gpu"])
     elif args["mode"] == "continue_training":
         continue_run(run_dir=Path(args["run_dir"]),
@@ -78,6 +79,18 @@ def start_run(config_file: Path, gpu: int = None):
     start_training(config)
 
 
+def start_run_with_metrics(config_file: Path, gpu: int = None):
+    config = Config(config_file)
+
+    # check if a GPU has been specified as command line argument. If yes, overwrite config
+    if gpu is not None and gpu >= 0:
+        config.device = f"cuda:{gpu}"
+    if gpu is not None and gpu < 0:
+        config.device = "cpu"
+        
+    metrics = start_tuning(config)
+    return metrics
+
 def start_hptuning(config_file: Path, gpu: int = None):
     config = Config(config_file)
 
@@ -86,9 +99,11 @@ def start_hptuning(config_file: Path, gpu: int = None):
         config.device = f"cuda:{gpu}"
     if gpu is not None and gpu < 0:
         config.device = "cpu"
-
-    metrics = start_tuning(config)
-    return metrics
+        
+    tuner = HpTuner()
+    tuner.run_tuning(
+        config_file=config_file,
+    )
 
 
 def continue_run(run_dir: Path, config_file: Path = None, gpu: int = None):
