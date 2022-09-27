@@ -165,7 +165,7 @@ class BaseTrainer(object):
 
         self.optimizer = self._get_optimizer()
         self.lr_scheduler = self._get_lr_scheduler()
-        LOGGER.info(f"Used lr-scheduler: {type(self.lr_scheduler)}")
+        LOGGER.info(f"Used lr-scheduler: {type(self.lr_scheduler)}") if self.logging else None
         
         self.loss_obj = self._get_loss_obj().to(self.device)
 
@@ -223,7 +223,7 @@ class BaseTrainer(object):
 
             self._train_epoch(epoch=epoch)
             avg_loss = self.experiment_logger.summarise()
-            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}")
+            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}") if self.logging else None
 
             if epoch % self.cfg.save_weights_every == 0:
                 self._save_weights_and_optimizer(epoch)
@@ -247,7 +247,7 @@ class BaseTrainer(object):
                 if self.cfg.metrics:
                     print_msg += f" -- Median validation metrics: "
                     print_msg += ", ".join(f"{k}: {v:.5f}" for k, v in valid_metrics.items() if k != 'avg_loss')
-                    LOGGER.info(print_msg)
+                    LOGGER.info(print_msg) if self.logging else None
 
         # make sure to close tensorboard to avoid losing the last epoch
         if self.cfg.log_tensorboard:
@@ -293,7 +293,7 @@ class BaseTrainer(object):
         self.experiment_logger.train()
 
         # process bar handle
-        pbar = tqdm(self.loader, file=sys.stdout)
+        pbar = tqdm(self.loader, file=sys.stdout, position=0, leave=True)
         pbar.set_description(f'# Epoch {epoch}')
 
         # Iterate in batches over training set
