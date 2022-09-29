@@ -223,7 +223,7 @@ class BaseTrainer(object):
 
             self._train_epoch(epoch=epoch)
             avg_loss = self.experiment_logger.summarise()
-            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}") if self.logging else None
+            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}")
 
             if epoch % self.cfg.save_weights_every == 0:
                 self._save_weights_and_optimizer(epoch)
