@@ -1,0 +1,7 @@
+params:
+- hidden_size
+- output_dropout
+- initial_forget_bias
+- model
+wd: /home/flix/Desktop/Master/NeuralHydrology
+yml_config: /home/flix/Desktop/Master/NeuralHydrology/5_basin.yml
