@@ -4,7 +4,7 @@ from neuralhydrology.evaluation.tester import BaseTester, RegressionTester, Unce
 from neuralhydrology.utils.config import Config
 
 
-def get_tester(cfg: Config, run_dir: Path, period: str, init_model: bool) -> BaseTester:
+def get_tester(cfg: Config, run_dir: Path, period: str, init_model: bool, logs: bool = True) -> BaseTester:
     """Get specific tester class objects depending on the model (head) type.
     
     Parameters
@@ -32,4 +32,4 @@ def get_tester(cfg: Config, run_dir: Path, period: str, init_model: bool) -> Bas
     else:
         NotImplementedError(f"No evaluation method implemented for {cfg.head} head")
 
-    return Tester(cfg=cfg, run_dir=run_dir, period=period, init_model=init_model)
+    return Tester(cfg=cfg, run_dir=run_dir, period=period, init_model=init_model, logs=logs)

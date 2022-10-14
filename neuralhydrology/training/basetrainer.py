@@ -60,8 +60,9 @@ class BaseTrainer(object):
         self._epoch = self._get_start_epoch_number()
 
         self._create_folder_structure()
-        setup_logging(str(self.cfg.run_dir / "output.log"))
 
+        setup_logging(str(self.cfg.run_dir / "output.log"))
+        
         LOGGER.info(f"### Folder structure created at {self.cfg.run_dir}") if self.logging else None
 
         if self.cfg.is_continue_training:
@@ -105,7 +106,7 @@ class BaseTrainer(object):
         self.loss_obj.set_regularization_terms(get_regularization_obj(cfg=self.cfg))
 
     def _get_tester(self) -> BaseTester:
-        return get_tester(cfg=self.cfg, run_dir=self.cfg.run_dir, period="validation", init_model=False)
+        return get_tester(cfg=self.cfg, run_dir=self.cfg.run_dir, period="validation", init_model=False, logs=not self.logging)
 
     def _get_data_loader(self, ds: BaseDataset) -> torch.utils.data.DataLoader:
         return DataLoader(ds, batch_size=self.cfg.batch_size, shuffle=True, num_workers=self.cfg.num_workers)
@@ -223,7 +224,7 @@ class BaseTrainer(object):
 
             self._train_epoch(epoch=epoch)
             avg_loss = self.experiment_logger.summarise()
-            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}")
+            LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}") if self.logging else None
 
             if epoch % self.cfg.save_weights_every == 0:
                 self._save_weights_and_optimizer(epoch)
@@ -293,7 +294,7 @@ class BaseTrainer(object):
         self.experiment_logger.train()
 
         # process bar handle
-        pbar = tqdm(self.loader, file=sys.stdout, position=0, leave=True)
+        pbar = tqdm(self.loader, file=sys.stdout, position=0, leave=True, disable=not self.logging)
         pbar.set_description(f'# Epoch {epoch}')
 
         # Iterate in batches over training set
@@ -390,7 +391,20 @@ class BaseTrainer(object):
                 self.cfg.run_dir = Path().cwd() / "runs" / run_name
             else:
                 self.cfg.run_dir = self.cfg.run_dir / run_name
-
+        
+        
+        cfg_dict = self.cfg.as_dict()
+        
+        if "hptuning" in cfg_dict.keys():
+            if "settings" in cfg_dict["hptuning"].keys():
+                self.cfg.run_dir = str(self.cfg.run_dir)
+                for key, value in cfg_dict["hptuning"]["settings"].items():
+                    self.cfg.run_dir += f"_{key}" + str(cfg_dict[key])
+                self.cfg.run_dir = Path(self.cfg.run_dir)
+            else:
+                LOGGER.warn(f"The hptuning dictionary in the .yml file does not have settings! Please add them to continue with the hptuning or delete the hptuning.")
+        
+        
         # create folder + necessary subfolder
         if not self.cfg.run_dir.is_dir():
             self.cfg.train_dir = self.cfg.run_dir / "train_data"

@@ -102,6 +102,8 @@ class BaseDataset(Dataset):
 
         # during training we log data processing with progress bars, but not during validation/testing
         self._disable_pbar = cfg.verbose == 0 or not self.is_train
+        if "hptuning" in self.cfg.as_dict().keys():
+            self._disable_pbar = True
 
         # initialize class attributes that are filled in the data loading functions
         self.x_d = {}

@@ -53,7 +53,7 @@ class HpTuner():
                     search_space[key] = tune.uniform(settings[key][0], settings[key][1])
                 elif self.possible_hyperparameters[key][-1] == str:
                     if settings[key][0] == "all":
-                        search_space[key] = tune.choice(["cudalstm", "ealstm", "arlstm", "gru", "embcudalstm", "mclstm"])
+                        search_space[key] = tune.choice(["cudalstm", "gru"])
                     else:
                         search_space[key] = tune.choice([settings[key][i] for i in range(len(settings[key]))])
         return search_space

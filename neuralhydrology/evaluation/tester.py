@@ -1,3 +1,5 @@
+from dis import dis
+from faulthandler import disable
 import logging
 import pickle
 import random
@@ -49,7 +51,7 @@ class BaseTester(object):
         If True, the model weights will be initialized with the checkpoint from the last available epoch in `run_dir`.
     """
 
-    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True):
+    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True, logs: bool = True):
         self.cfg = cfg
         self.run_dir = run_dir
         self.init_model = init_model
@@ -69,6 +71,7 @@ class BaseTester(object):
         self.scaler = None
         self.id_to_int = {}
         self.additional_features = []
+        self.logs = logs
 
         # placeholder to store cached validation data
         self.cached_datasets = {}
@@ -189,7 +192,7 @@ class BaseTester(object):
 
         results = defaultdict(dict)
 
-        pbar = tqdm(basins, file=sys.stdout)
+        pbar = tqdm(basins, file=sys.stdout, disable=self.logs)
         pbar.set_description('# Validation' if self.period == "validation" else "# Evaluation")
 
         for basin in pbar:
@@ -477,7 +480,7 @@ class RegressionTester(BaseTester):
         If True, the model weights will be initialized with the checkpoint from the last available epoch in `run_dir`.
     """
 
-    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True):
+    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True, logs: bool = True):
         super(RegressionTester, self).__init__(cfg, run_dir, period, init_model)
 
     def _subset_targets(self, model: BaseModel, data: Dict[str, torch.Tensor], predictions: np.ndarray,
@@ -514,7 +517,7 @@ class UncertaintyTester(BaseTester):
         If True, the model weights will be initialized with the checkpoint from the last available epoch in `run_dir`.
     """
 
-    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True):
+    def __init__(self, cfg: Config, run_dir: Path, period: str = "test", init_model: bool = True, logs: bool = True):
         super(UncertaintyTester, self).__init__(cfg, run_dir, period, init_model)
 
     def _get_predictions_and_loss(self, model: BaseModel, data: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, float]:

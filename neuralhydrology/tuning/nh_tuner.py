@@ -28,13 +28,13 @@ from ray.tune.search.optuna import OptunaSearch
 
 LOGGER = logging.getLogger(__name__)
 
-# TODO: tune.py needs to send possible hyperparameters to nh_tuner.py
-# TODO: Get search space from tune to nh_tuner via settings file
-
-# TODO: Files abändern beim hyperparameter tuning so dass auch hyperparameter drin sind (keine überschneidungen mehr!)
-# TODO: PBAR unterdrücken
-# TODO: LOGGING schauen obs funktioniert
+# TODO: Files abändern beim hyperparameter tuning so dass auch hyperparameter drin sind (keine überschneidungen mehr!) DONE
+# TODO: Logging to unterdrücken? Create lookup table unterdrücken?
+# TODO: PBAR unterdrücken 
+# TODO: LOGGING schauen obs funktioniert: FUNKTIONIERT
 # TODO: Metricen als objective fürs tuning.
+# TODO: mclstm doesnt work / embcudalstm deprecated / arlstm doesnt work / ealstm doesnt work !!!
+# TODO: Find second logger for hptuning and disable it.
 
 class Nh_Tuner(tune.Trainable):
 
@@ -73,7 +73,6 @@ class Nh_Tuner(tune.Trainable):
         ## setting the hyperparameters
         for key in self.possible_hyperparameters:
             config_dict[key] = tuning_config[key]
-            print(f"{key}, {config_dict[key]}")
         self.yml_config._cfg = config_dict
         dt = datetime.now() 
         file_name = "hp--" + str(dt).replace(":", '_').replace('.','_') + ".yml"
@@ -84,14 +83,14 @@ class Nh_Tuner(tune.Trainable):
         self.define_hparams(tuning_config)
         os.chdir(self.working_dir)
         if torch.cuda.is_available():
-            metrics = self.start_run_with_metrics(config_file=self.yml_config_PATH)
+            metrics = self.start_run_with_metrics(config_file=self.config_file)
         # fall back to CPU-only mode
         else:
-            metrics = self.start_run_with_metrics(config_file=self.yml_config_PATH, gpu=-1)
+            metrics = self.start_run_with_metrics(config_file=self.config_file, gpu=-1)
         eval_metric = self.get_metrics(metrics, 'avg_loss',3)
         return {"mean_loss": eval_metric}
 
-    def get_metrics(self, metrics, used_metric,epoch_lookback):
+    def get_metrics(self, metrics, used_metric,epoch_lookback, logging=False):
         # epoch_lookback: average the last x epochs for a metric to not just use a lucky drop in loss.
         sorted_metrics = dict()
         for key in metrics[0].keys():
@@ -102,8 +101,8 @@ class Nh_Tuner(tune.Trainable):
         eval_metric = sorted_metrics[used_metric][-epoch_lookback:]
         eval_metric = np.mean(np.array(eval_metric))
 
-        LOGGER.info(f"Using {used_metric} as metric.")
-        LOGGER.info(f"Averaging the last {epoch_lookback} epochs.")
+        LOGGER.info(f"Using {used_metric} as metric.") if logging else None
+        LOGGER.info(f"Averaging the last {epoch_lookback} epochs.") if logging else None
 
         return eval_metric
     
