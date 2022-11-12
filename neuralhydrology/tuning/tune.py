@@ -21,12 +21,20 @@ LOGGER = logging.getLogger(__name__)
 class HpTuner():
 
     def __init__(self):
+        """Default values for all settings.
+        If a new hyperparameters gets added, then just add them here and in the yml.
+        """
         self.possible_hyperparameters = {"hidden_size": (23, 256, int),
                                          "output_dropout": (0.0, 0.99, float), 
                                          "initial_forget_bias": (0.0, 7.0, float),
+                                         "batch_size": (32, 512, int),
                                          "model": ("all", str)}
+        self.all_models = ["cudalstm", "gru"]
+        self.metric_modes = {"NSE": "max", "RMSE": "min"}
         self.default_num_runs_per_gpu = 1
         self.default_num_runs_per_cpu = 1
+        self.default_metric = "NSE"
+        
     
     def save_settings(self, config_file, search_space):
         """
@@ -38,6 +46,7 @@ class HpTuner():
         settings = {"yml_config": str(config_file.resolve()), 
                     "wd": os.getcwd(),
                     "params": list(self.possible_hyperparameters.keys())}
+        
         with open(rf"{nh_dir}/tuning/settings/settings.yml", 'w') as file:
             yaml.dump(settings, file)
             
@@ -53,7 +62,7 @@ class HpTuner():
                     search_space[key] = tune.uniform(settings[key][0], settings[key][1])
                 elif self.possible_hyperparameters[key][-1] == str:
                     if settings[key][0] == "all":
-                        search_space[key] = tune.choice(["cudalstm", "gru"])
+                        search_space[key] = tune.choice(self.all_models)
                     else:
                         search_space[key] = tune.choice([settings[key][i] for i in range(len(settings[key]))])
         return search_space
@@ -71,14 +80,10 @@ class HpTuner():
         """
 
         setup_logging("./hptuning.log")
-        
         cfg = Config(config_file)
         search_space = self.read_search_space(cfg)
-        
         self.save_settings(config_file, search_space)
-        
         num_samples = cfg.hptuning["runs"]
-        
         if cfg.hptuning.get("sim_runs_per_gpu") is None:
             # preferred default setting for nr of runs per gpu at the same time
             # change the denominator to the number of parallel runs
@@ -87,7 +92,7 @@ class HpTuner():
             num_runs_per_gpu = 1/cfg.hptuning["sim_runs_per_gpu"]
         else:
             LOGGER.warn(f"Something is wrong with the \"sim_runs_per_gpu\" attribute")
-        
+            
         if cfg.hptuning.get("sim_runs_per_cpu") is None:
             # preferred default setting for nr of runs per cpu at the same time
             # change the denominator to the number of parallel runs
@@ -95,8 +100,17 @@ class HpTuner():
         elif isinstance(cfg.hptuning["sim_runs_per_cpu"], int):
             num_runs_per_cpu = 1/cfg.hptuning["sim_runs_per_cpu"]
         else:
-            LOGGER.warn(f"Something is wrong with the \"sim_runs_per_cpu\" attribute")
+            LOGGER.warn(f"Something is wrong with the \"sim_runs_per_cpu\" attribute")    
             
+        if cfg.hptuning.get("metric") is None:
+            # preferred default setting for nr of runs per cpu at the same time
+            # change the denominator to the number of parallel runs
+            metric = self.default_metric
+        elif isinstance(cfg.hptuning["metric"], str):
+            metric = cfg.hptuning["metric"]
+            mode = self.metric_modes[metric]
+        else:
+            LOGGER.warn(f"Something is wrong with the \"metric\" attribute")    
             
         search_alg = OptunaSearch()
         search_alg = ConcurrencyLimiter(search_alg, max_concurrent=10)
@@ -106,8 +120,8 @@ class HpTuner():
             resources={"cpu":num_runs_per_cpu, "gpu": num_runs_per_gpu}
             ),
             tune_config=tune.TuneConfig(
-                metric="mean_loss",
-                mode="min",
+                metric=metric,
+                mode=mode,
                 search_alg=search_alg,
                 num_samples=num_samples,
             ),
@@ -116,8 +130,5 @@ class HpTuner():
                 stop={"training_iteration": 1},
             ),
         )
-        
         results = self.tuner.fit()
-        
-        
         LOGGER.info(f"Best hyperparameters found were: {results.get_best_result().config}")
