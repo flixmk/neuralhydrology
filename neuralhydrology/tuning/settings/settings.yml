@@ -5,4 +5,4 @@ params:
 - batch_size
 - model
 wd: /home/flix/Desktop/Master/NeuralHydrology
-yml_config: /home/flix/Desktop/Master/NeuralHydrology/5_basin.yml
+yml_config: /home/flix/Desktop/Master/NeuralHydrology/testing.yml

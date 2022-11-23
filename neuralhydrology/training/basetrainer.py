@@ -88,16 +88,21 @@ class BaseTrainer(object):
     def _get_optimizer(self) -> torch.optim.Optimizer:
         return get_optimizer(model=self.model, cfg=self.cfg)
     
-    def _get_lr_scheduler(self) -> torch.optim.lr_scheduler:
-        if self.cfg.learning_rate["scheduler"] == "plateau" or self.cfg.learning_rate["scheduler"] == "default":
-            return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
-        elif self.cfg.learning_rate["scheduler"] == 'linear':
-            return torch.optim.lr_scheduler.LinearLR(self.optimizer)
-        elif self.cfg.learning_rate["scheduler"] == "exponential":
-            return torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.5)
-        else:
-            LOGGER.warning(f"Selected scheduler is not a valid / supported scheduler. The default scheduler is chosen (ReduceLROnPlateau).")
-            return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+    def _get_lr_scheduler(self) -> torch.optim.lr_scheduler:        
+        if type(self.cfg.learning_rate) == dict:
+            if "scheduler" in list(self.cfg.learning_rate.keys()):
+                if self.cfg.learning_rate["scheduler"] == "plateau" or self.cfg.learning_rate["scheduler"] == "default":
+                    return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+                elif self.cfg.learning_rate["scheduler"] == 'linear':
+                    return torch.optim.lr_scheduler.LinearLR(self.optimizer)
+                elif self.cfg.learning_rate["scheduler"] == "exponential":
+                    return torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.5)
+                else:
+                    LOGGER.warning(f"Selected scheduler is not a valid / supported scheduler. The default scheduler is chosen (ReduceLROnPlateau).")
+                    return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+            else:
+                LOGGER.warning(f"No scheduler defined in the .yml. Using the default (ReduceLROnPlateau)")
+                return torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
         
     def _get_loss_obj(self) -> loss.BaseLoss:
         return get_loss_obj(cfg=self.cfg)

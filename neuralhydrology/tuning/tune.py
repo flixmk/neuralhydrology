@@ -2,17 +2,13 @@ import os
 import yaml
 import logging
 from pathlib import Path
-from datetime import datetime
 
 import neuralhydrology
 from neuralhydrology.utils.config import Config
 from neuralhydrology.tuning.nh_tuner import Nh_Tuner
 from neuralhydrology.utils.logging_utils import setup_logging
-from distutils.command.config import config
 
-import ray
 from ray import tune, air
-from ray.air import session
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.optuna import OptunaSearch
 
@@ -30,7 +26,19 @@ class HpTuner():
                                          "batch_size": (32, 512, int),
                                          "model": ("all", str)}
         self.all_models = ["cudalstm", "gru"]
-        self.metric_modes = {"NSE": "max", "RMSE": "min"}
+        self.metric_modes = {
+            "NSE": "max", 
+            "RMSE": "min", 
+            "MSE": "min", 
+            "KGE": "max",
+            "Alpha-NSE": "max",
+            "Pearson-r": "max",
+            "Beta-KGE": "min",
+            "Beta-NSE": "min",
+            "FHV": "max",
+            "FMS": "max",
+            "FLV": "max",
+            "Peak-Timing": "min"}
         self.default_num_runs_per_gpu = 1
         self.default_num_runs_per_cpu = 1
         self.default_metric = "NSE"
@@ -85,8 +93,6 @@ class HpTuner():
         self.save_settings(config_file, search_space)
         num_samples = cfg.hptuning["runs"]
         if cfg.hptuning.get("sim_runs_per_gpu") is None:
-            # preferred default setting for nr of runs per gpu at the same time
-            # change the denominator to the number of parallel runs
             num_runs_per_gpu = self.default_num_runs_per_gpu
         elif isinstance(cfg.hptuning["sim_runs_per_gpu"], int):
             num_runs_per_gpu = 1/cfg.hptuning["sim_runs_per_gpu"]
@@ -94,8 +100,6 @@ class HpTuner():
             LOGGER.warn(f"Something is wrong with the \"sim_runs_per_gpu\" attribute")
             
         if cfg.hptuning.get("sim_runs_per_cpu") is None:
-            # preferred default setting for nr of runs per cpu at the same time
-            # change the denominator to the number of parallel runs
             num_runs_per_cpu = self.default_num_runs_per_cpu
         elif isinstance(cfg.hptuning["sim_runs_per_cpu"], int):
             num_runs_per_cpu = 1/cfg.hptuning["sim_runs_per_cpu"]
@@ -103,8 +107,6 @@ class HpTuner():
             LOGGER.warn(f"Something is wrong with the \"sim_runs_per_cpu\" attribute")    
             
         if cfg.hptuning.get("metric") is None:
-            # preferred default setting for nr of runs per cpu at the same time
-            # change the denominator to the number of parallel runs
             metric = self.default_metric
         elif isinstance(cfg.hptuning["metric"], str):
             metric = cfg.hptuning["metric"]
