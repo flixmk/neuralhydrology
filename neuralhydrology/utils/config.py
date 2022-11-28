@@ -438,7 +438,7 @@ class Config(object):
             else:
                 raise ValueError("Unsupported data type. Should be a dictionary")
         else:
-            pass
+            raise ValueError("For hyperparametertuning to work you need to fill in the tuning information into the .yml file")
 
 
     @property

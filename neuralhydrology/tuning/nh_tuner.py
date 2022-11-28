@@ -3,6 +3,8 @@ import os
 import neuralhydrology
 from pathlib import Path
 from neuralhydrology.utils.config import Config
+from neuralhydrology.training.basetrainer import BaseTrainer
+from neuralhydrology.training.umaltrainer import UMALTrainer
 import torch
 import numpy as np
 from neuralhydrology.training.train import start_tuning
@@ -20,8 +22,26 @@ class Nh_Tuner(tune.Trainable):
             tuning_config (_type_): _description_
         """
         self.load_settings()
+        
         self.tuning_config = tuning_config
-    
+        
+        os.chdir(self.working_dir)
+        
+        if self.cfg.head.lower() in ['regression', 'gmm', 'cmal', '']:
+            self.trainer = BaseTrainer(cfg=self.cfg, logging_flag=False)
+        elif self.cfg.head.lower() == 'umal':
+            self.trainer = UMALTrainer(cfg=self.cfg)
+        else:
+            raise ValueError(f"Unknown head {self.cfg.head}.")
+        self.trainer.initialize_training()
+        # metrics = trainer.train_and_validate()
+        self.epoch_iteration = 0
+        
+        self.define_hparams(tuning_config)
+        
+        
+        
+        
     def step(self):
         score = self.objective(self.tuning_config)
         return score
@@ -70,14 +90,19 @@ class Nh_Tuner(tune.Trainable):
         Returns:
             float: metric
         """
-        self.define_hparams(tuning_config)
-        os.chdir(self.working_dir)
-        if torch.cuda.is_available():
-            metrics = self.start_run_with_metrics(cfg=self.cfg)
+        # self.define_hparams(tuning_config)
+        # 
+        #if torch.cuda.is_available():
+        #    metrics = self.start_run_with_metrics(cfg=self.cfg)
         # fall back to CPU-only mode
-        else:
-            metrics = self.start_run_with_metrics(cfg=self.cfg, gpu=-1)
-            
+        #else:
+        #    metrics = self.start_run_with_metrics(cfg=self.cfg, gpu=-1)
+        
+        metrics = self.trainer.train_and_validate_iteration(epoch=self.epoch_iteration)
+        # print(f"Trained Epoch: {self.epoch_iteration}")
+        self.epoch_iteration += 1
+        
+        
         eval_metric = self.get_metrics(metrics, self.cfg.hptuning["metric"],3)
         return {self.cfg.hptuning["metric"]: eval_metric}
 

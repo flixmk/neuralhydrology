@@ -261,6 +261,50 @@ class BaseTrainer(object):
 
         # felix_krause: temporary change to forward an evaluation metric
         return metrics_across_epochs
+    
+    def train_and_validate_iteration(self, epoch):
+        """Train and validate the model.
+
+        Train the model for the number of epochs specified in the run configuration, and perform validation after every
+        ``validate_every`` epochs. Model and optimizer state are saved after every ``save_weights_every`` epochs.
+        """
+        metrics_across_epochs = list()
+        # this is the manual lr-rate code. Replaced with a lr-scheduler.
+#            if epoch in self.cfg.learning_rate.keys():
+#                LOGGER.info(f"Setting learning rate to {self.cfg.learning_rate[epoch]}") if self.logging else None
+#                for param_group in self.optimizer.param_groups:
+#                    param_group["lr"] = self.cfg.learning_rate[epoch]
+
+        self._train_epoch(epoch=epoch)
+        avg_loss = self.experiment_logger.summarise()
+        LOGGER.info(f"Epoch {epoch} average loss: {avg_loss}") if self.logging else None
+
+        if epoch % self.cfg.save_weights_every == 0:
+            self._save_weights_and_optimizer(epoch)
+
+        if (self.validator is not None) and (epoch % self.cfg.validate_every == 0):
+            self.validator.evaluate(epoch=epoch,
+                                    save_results=self.cfg.save_validation_results,
+                                    metrics=self.cfg.metrics,
+                                    model=self.model,
+                                    experiment_logger=self.experiment_logger.valid())
+
+            valid_metrics = self.experiment_logger.summarise()
+            metrics_across_epochs.append(valid_metrics)
+            if type(self.lr_scheduler) == torch.optim.lr_scheduler.ReduceLROnPlateau:
+                self.lr_scheduler.step(valid_metrics['avg_loss'])
+            else:
+                self.lr_scheduler.step()
+            # LOGGER.info(f"Current LR: {self.optimizer.param_groups[0]['lr']}")
+                
+            print_msg = f"Epoch {epoch} average validation loss: {valid_metrics['avg_loss']:.5f}"
+            if self.cfg.metrics:
+                print_msg += f" -- Median validation metrics: "
+                print_msg += ", ".join(f"{k}: {v:.5f}" for k, v in valid_metrics.items() if k != 'avg_loss')
+                LOGGER.info(print_msg) if self.logging else None
+
+        return metrics_across_epochs
+
 
     def _get_start_epoch_number(self):
         if self.cfg.is_continue_training:

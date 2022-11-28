@@ -129,7 +129,7 @@ class HpTuner():
             ),
             param_space=search_space,
             run_config=air.RunConfig(
-                stop={"training_iteration": 1},
+                stop={"training_iteration": cfg.epochs},
             ),
         )
         results = self.tuner.fit()
