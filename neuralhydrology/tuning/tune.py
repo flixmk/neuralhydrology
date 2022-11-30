@@ -2,6 +2,7 @@ import os
 import yaml
 import logging
 from pathlib import Path
+from datetime import datetime
 
 import neuralhydrology
 from neuralhydrology.utils.config import Config
@@ -11,15 +12,21 @@ from neuralhydrology.utils.logging_utils import setup_logging
 from ray import tune, air
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.optuna import OptunaSearch
+from ray.tune.stopper import CombinedStopper,MaximumIterationStopper, TrialPlateauStopper
+
 
 LOGGER = logging.getLogger(__name__)
 
 class HpTuner():
 
-    def __init__(self):
+    def __init__(self, run_name = None):
         """Default values for all settings.
         If a new hyperparameters gets added, then just add them here and in the yml.
         """
+        
+        # used for tensorboard to find the location of the trial.
+        self.run_name = run_name
+        
         self.possible_hyperparameters = {"hidden_size": (23, 256, int),
                                          "output_dropout": (0.0, 0.99, float), 
                                          "initial_forget_bias": (0.0, 7.0, float),
@@ -116,6 +123,12 @@ class HpTuner():
             
         search_alg = OptunaSearch()
         search_alg = ConcurrencyLimiter(search_alg, max_concurrent=10)
+        
+        stopper = CombinedStopper(
+            MaximumIterationStopper(max_iter=cfg.epochs),
+            TrialPlateauStopper(metric=metric, mode=self.metric_modes[metric])
+            )
+        
         self.tuner = tune.Tuner(
             tune.with_resources(
             Nh_Tuner,
@@ -129,8 +142,16 @@ class HpTuner():
             ),
             param_space=search_space,
             run_config=air.RunConfig(
-                stop={"training_iteration": cfg.epochs},
+                name=self.run_name if self.run_name is not None else None,
+                stop=stopper,
             ),
         )
         results = self.tuner.fit()
         LOGGER.info(f"Best hyperparameters found were: {results.get_best_result().config}")
+
+        cfg_dict = cfg.as_dict()
+        for key, value in results.get_best_result().config.items():
+            cfg_dict[key] = value
+        cfg._cfg = cfg_dict
+        date_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+        cfg.dump_config(folder=Path("./"), filename=f"{date_time}_best_config.yml")

@@ -16,17 +16,19 @@ LOGGER = logging.getLogger(__name__)
 class Nh_Tuner(tune.Trainable):
 
     def setup(self, tuning_config):
-        """summary
+        """Gets called for each new trial once. 
 
         Args:
             tuning_config (_type_): _description_
         """
         self.load_settings()
-        
         self.tuning_config = tuning_config
+        # define hyperparameter of this trial
+        self.define_hparams(tuning_config)
         
+        # ray tune changes the working directory.
+        # need to change it back to folder with .yml
         os.chdir(self.working_dir)
-        
         if self.cfg.head.lower() in ['regression', 'gmm', 'cmal', '']:
             self.trainer = BaseTrainer(cfg=self.cfg, logging_flag=False)
         elif self.cfg.head.lower() == 'umal':
@@ -34,13 +36,7 @@ class Nh_Tuner(tune.Trainable):
         else:
             raise ValueError(f"Unknown head {self.cfg.head}.")
         self.trainer.initialize_training()
-        # metrics = trainer.train_and_validate()
         self.epoch_iteration = 0
-        
-        self.define_hparams(tuning_config)
-        
-        
-        
         
     def step(self):
         score = self.objective(self.tuning_config)
@@ -90,20 +86,11 @@ class Nh_Tuner(tune.Trainable):
         Returns:
             float: metric
         """
-        # self.define_hparams(tuning_config)
-        # 
-        #if torch.cuda.is_available():
-        #    metrics = self.start_run_with_metrics(cfg=self.cfg)
-        # fall back to CPU-only mode
-        #else:
-        #    metrics = self.start_run_with_metrics(cfg=self.cfg, gpu=-1)
-        
         metrics = self.trainer.train_and_validate_iteration(epoch=self.epoch_iteration)
-        # print(f"Trained Epoch: {self.epoch_iteration}")
         self.epoch_iteration += 1
         
         
-        eval_metric = self.get_metrics(metrics, self.cfg.hptuning["metric"],3)
+        eval_metric = self.get_metrics(metrics, self.cfg.hptuning["metric"])
         return {self.cfg.hptuning["metric"]: eval_metric}
 
     def get_metrics(self, metrics, metric_name, epoch_lookback=1, logging=False):
