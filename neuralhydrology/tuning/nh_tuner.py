@@ -67,8 +67,11 @@ class Nh_Tuner(tune.Trainable):
         """
         config_dict = self.cfg.as_dict()
         ## setting the hyperparameters
-        for key in self.possible_hyperparameters:
-            config_dict[key] = tuning_config[key]
+        for key, value in self.possible_hyperparameters.items():
+            if value[-1] == float:
+                config_dict[key] = round(tuning_config[key],3)
+            else:
+                config_dict[key] = tuning_config[key]
         ## setting metric to be optimized
         if "metric" in config_dict["hptuning"].keys():
             config_dict["metrics"] = [config_dict["hptuning"]["metric"]]

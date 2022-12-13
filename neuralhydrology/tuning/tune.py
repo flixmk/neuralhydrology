@@ -60,13 +60,12 @@ class HpTuner():
         Path(nh_dir + "/tuning/settings/").mkdir(parents=True, exist_ok=True)
         settings = {"yml_config": str(config_file.resolve()), 
                     "wd": os.getcwd(),
-                    "params": list(self.possible_hyperparameters.keys())}
+                    "params": self.possible_hyperparameters}
         
         with open(rf"{nh_dir}/tuning/settings/settings.yml", 'w') as file:
             yaml.dump(settings, file)
             
     def read_search_space(self, cfg):
-        
         settings = cfg.hptuning["settings"]
         search_space = dict()
         for key, _ in self.possible_hyperparameters.items():

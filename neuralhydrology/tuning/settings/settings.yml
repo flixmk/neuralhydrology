@@ -1,8 +1,22 @@
 params:
-- hidden_size
-- output_dropout
-- initial_forget_bias
-- batch_size
-- model
+  batch_size: !!python/tuple
+  - 32
+  - 512
+  - &id001 !!python/name:builtins.int ''
+  hidden_size: !!python/tuple
+  - 23
+  - 256
+  - *id001
+  initial_forget_bias: !!python/tuple
+  - 0.0
+  - 7.0
+  - &id002 !!python/name:builtins.float ''
+  model: !!python/tuple
+  - all
+  - !!python/name:builtins.str ''
+  output_dropout: !!python/tuple
+  - 0.0
+  - 0.99
+  - *id002
 wd: /home/flix/Desktop/Master/NeuralHydrology
 yml_config: /home/flix/Desktop/Master/NeuralHydrology/testing.yml
